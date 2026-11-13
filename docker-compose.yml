@@ -1,0 +1,90 @@
+# Support Desk SaaS - reliability lab
+# One command brings up the whole stack:  docker compose up -d --build
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: app            # superuser, used for admin and fixes
+      POSTGRES_PASSWORD: appsecret
+      POSTGRES_DB: saas
+    command:
+      - postgres
+      - -c
+      - max_connections=40                 # small on purpose (scenario 6)
+      - -c
+      - client_connection_check_interval=2s
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d saas"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./api
+    environment:
+      # The API logs in as a normal (non-superuser) role.
+      # Scenario 4 overrides API_DB_PASSWORD to simulate a bad deployment.
+      DATABASE_URL: postgresql://api_user:${API_DB_PASSWORD:-apisecret}@db:5432/saas
+      NOTIFY_URL: http://mock-webhook:9000/notify
+      NOTIFY_TIMEOUT: "3"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mock-webhook:
+    # Stands in for a third-party notification service (scenario 3)
+    image: python:3.12-slim
+    command: ["python", "-u", "/app/server.py"]
+    environment:
+      DELAY: ${MOCK_DELAY:-0.05}
+    volumes:
+      - ./mock:/app:ro
+
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    environment:
+      DATA_SOURCE_NAME: postgresql://app:appsecret@db:5432/saas?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+  tester:
+    # Runs the pytest suite inside the Docker network:  docker compose run --rm tester
+    build: ./tests
+    profiles: ["test"]
+    environment:
+      API_URL: http://api:8000
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
