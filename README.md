@@ -1,6 +1,10 @@
-# Support Desk SaaS: Reliability Lab
+# SaaS Reliability & Support Operations
 
-A small multi-tenant support-ticketing service that you run, monitor, break on purpose and fix. Everything runs in Docker Compose:
+A small multi-tenant support-ticketing service ("Support Desk") that I run, monitor, break on purpose and fix, to practise production support: monitoring, diagnosis from logs, metrics and SQL, and prevention.
+
+**Results:** 6 simulated incidents diagnosed and fixed (write-ups in [INCIDENTS.md](INCIDENTS.md)); a missing-index fix took the search query from 54 ms to 0.3 ms and the API request from 46 ms to 17 ms; a Bash health check covers a dozen checks in about 2 s; 30 pytest tests pass.
+
+Everything runs in Docker Compose:
 
 | Service | What it is | URL |
 | --- | --- | --- |
@@ -11,40 +15,34 @@ A small multi-tenant support-ticketing service that you run, monitor, break on p
 | `prometheus` | Collects metrics every 5 s | http://localhost:9090 |
 | `grafana` | "Support Desk SaaS - Service Health" dashboard | http://localhost:3000 |
 
-## You need
+## Requirements
 
 - Docker Desktop (or Docker Engine + the Compose plugin): `docker compose version` should work.
 - A Bash terminal with `curl`: Linux, macOS, or WSL on Windows.
-- Postman (optional) for manual API calls.
-
-## Part 1 (Wednesday evening, about 3.5 hours)
+## Getting started
 
 ```bash
 chmod +x scripts/*.sh
 docker compose up -d --build          # first run downloads images: allow ~5-10 min
-docker compose ps                     # everything should say "running"
+docker compose ps                     # everything should be running
 curl -s localhost:8000/health         # {"status": "ok", ...}
-scripts/seed.sh                       # 3,000,000 tickets; use a smaller number on a slow laptop
-scripts/healthcheck.sh                # your diagnostics script
+scripts/seed.sh 1000000               # load 1 million fake tickets
+scripts/healthcheck.sh                # one-command diagnostics
 ```
 
-Open http://localhost:8000/docs and try the endpoints with the header `X-API-Key: agent-key-123`. Then run background traffic in a second terminal so the dashboard fills up:
+Open http://localhost:8000/docs and try the endpoints with the header `X-API-Key: agent-key-123`. Run background traffic in a second terminal so the dashboard fills up:
 
 ```bash
 scripts/traffic.sh 600
 ```
 
-Then do **scenario 1** (below) and record your before and after numbers in `INCIDENTS.md`.
-
-## Part 2 (Thursday 9-12)
-
-Scenarios 2 to 6, then the test suite:
+## Tests
 
 ```bash
 docker compose run --rm tester        # 30 tests: API, negative, integration, regression
 ```
 
-Try a test failing on purpose: run `scripts/scenario.sh 1 break`, run the tests, watch `test_customer_search_within_budget` fail, then fix it again. That's what a regression test is for.
+The regression tests catch the scenarios coming back: run `scripts/scenario.sh 1 break` and `test_customer_search_within_budget` fails until the index is restored.
 
 ## API keys
 
@@ -58,7 +56,7 @@ Try a test failing on purpose: run `scripts/scenario.sh 1 break`, run the tests,
 
 ## The six incidents
 
-Run `scripts/scenario.sh <n> break`, then **diagnose it yourself before reading the answer**: dashboard first, then `scripts/healthcheck.sh`, then logs and SQL. Fix with `scripts/scenario.sh <n> fix`, or better, with the commands by hand.
+Run `scripts/scenario.sh <n> break`, then diagnose it: dashboard first, then `scripts/healthcheck.sh`, then logs and SQL. Fix with `scripts/scenario.sh <n> fix`, or better, with the commands by hand.
 
 Useful diagnosis commands:
 
@@ -102,13 +100,13 @@ docker compose exec db psql -U app -d saas          # SQL shell as the admin
 
 ### 6. Connection exhaustion
 - **Symptom:** intermittent then constant 503s; "Database connections in use" flat at the limit (40).
-- **Diagnose:** `healthcheck.sh` shows connections near the limit and the top holders; in SQL: `SELECT usename, state, query, count(*) FROM pg_stat_activity GROUP BY 1,2,3 ORDER BY 4 DESC;` shows many idle `pg_sleep` sessions.
+- **Diagnose:** `healthcheck.sh` shows connections near the limit and the top holders; in SQL: `SELECT usename, state, query, count(*) FROM pg_stat_activity GROUP BY 1,2,3 ORDER BY 4 DESC;` shows dozens of sessions stuck running `pg_sleep`.
 - **Fix:** terminate the stuck sessions (`pg_terminate_backend`). The admin can still log in because Postgres reserves slots for superusers.
 - **Prevent:** a connection pool in the API, `idle_in_transaction_session_timeout`, an alert at 80% of `max_connections`.
 
-## Read the Bash scripts line by line
+## The Bash scripts
 
-These scripts are your Bash practice for the interview. Read each one until you can explain every line:
+The operational tooling is plain Bash. What each script does and the techniques it uses:
 
 | Script | Bash ideas in it |
 | --- | --- |
