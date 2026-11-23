@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# One-command diagnostics: containers, API, database, logs, integration, metrics.
-# Exits 0 if everything passes, 1 if anything fails.
+# One-command diagnostics: containers, API, database, logs, integration, metrics
+# Exits 0 if everything passes, 1 if anything fails
 # Usage: scripts/healthcheck.sh
 set -uo pipefail          # no -e: keep checking after a failure
 cd "$(dirname "$0")/.."
