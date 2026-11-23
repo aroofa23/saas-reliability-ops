@@ -1,7 +1,7 @@
-"""Fake third-party notification service.
+"""Fake third-party notification service
 
 DELAY (seconds) controls how slow it responds. Scenario 3 sets it high
-so the API's outbound call times out.
+so the API's outbound call times out
 """
 import json
 import os
