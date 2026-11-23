@@ -25,7 +25,7 @@ DB_DSN = os.environ.get("DATABASE_URL", "postgresql://api_user:apisecret@db:5432
 NOTIFY_URL = os.environ.get("NOTIFY_URL", "http://mock-webhook:9000/notify")
 NOTIFY_TIMEOUT = float(os.environ.get("NOTIFY_TIMEOUT", "3"))
 
-# ---------------------------------------------------------------- logging
+# ----------------------------- logging ----------------------------------- 
 log = logging.getLogger("api")
 _handler = logging.StreamHandler(sys.stdout)
 _handler.setFormatter(logging.Formatter("%(message)s"))
@@ -44,7 +44,7 @@ def log_event(level: str, event: str, **fields):
     log.log(LEVELS.get(level, logging.INFO), json.dumps(record))
 
 
-# ---------------------------------------------------------------- metrics
+# --------------------------------- metrics -------------------------------
 REQUESTS = Counter("http_requests_total", "HTTP requests", ["method", "path", "status"])
 LATENCY = Histogram(
     "http_request_duration_seconds",
@@ -87,7 +87,7 @@ async def observe(request: Request, call_next):
             )
 
 
-# ---------------------------------------------------------------- database
+# ------------------------------- database --------------------------------- 
 @contextmanager
 def db():
     """Open a connection, give back a dict cursor, commit or roll back, close.
@@ -115,7 +115,7 @@ def db():
         conn.close()
 
 
-# ---------------------------------------------------------------- auth / RBAC
+# ----------------------------- auth -----------------------------------
 ROLE_RANK = {"viewer": 1, "agent": 2, "admin": 3}
 
 
@@ -151,7 +151,7 @@ def require(role: str):
     return check
 
 
-# ---------------------------------------------------------------- models
+# ------------------------------- models ---------------------------------
 EMAIL = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
 PRIORITY = "^(low|normal|high|urgent)$"
 STATUS = "^(open|pending|resolved|closed)$"
@@ -171,7 +171,7 @@ class TicketPatch(BaseModel):
     priority: Optional[str] = Field(default=None, pattern=PRIORITY)
 
 
-# ---------------------------------------------------------------- endpoints
+# -------------------------------- endpoints -------------------------------- 
 @app.get("/health")
 def health():
     start = time.perf_counter()
@@ -263,7 +263,7 @@ def update_ticket(ticket_id: int, patch: TicketPatch, user=Depends(require("agen
         raise HTTPException(422, "nothing to update")
     with db() as cur:
         _get_ticket(cur, ticket_id, user["org_id"])
-        sets = ", ".join(f"{field} = %s" for field in changes)  # field names come from the model, not the user
+        sets = ", ".join(f"{field} = %s" for field in changes)  # field names come from the model not the user
         cur.execute(
             f"UPDATE tickets SET {sets}, updated_at = now() WHERE id = %s RETURNING {COLS}",
             (*changes.values(), ticket_id),
