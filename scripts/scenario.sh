@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Break and fix the system on purpose, one incident at a time.
+# Break and fix the system on purpose, one incident at a time
 # Usage: scripts/scenario.sh <1-6> <break|fix>
 #        scripts/scenario.sh list
 set -euo pipefail
@@ -84,7 +84,7 @@ case "$1:$action" in
         ;;
 
     6:break)
-        # Open 40 idle sessions as the API's own role; they hog every normal slot.
+        # Open 40 idle sessions as the API's own role, they hog every normal slot
         : > "$PID_FILE"
         for i in $(seq 1 40); do
             docker compose exec -T db \
@@ -96,7 +96,7 @@ case "$1:$action" in
         echo "Started $(wc -l < "$PID_FILE") hogging sessions (PIDs in $PID_FILE)."
         ;;
     6:fix)
-        # The superuser can still log in: Postgres reserves a few slots for it.
+        # The superuser can still log in: Postgres reserves a few slots for it
         sql "SELECT count(pg_terminate_backend(pid)) AS terminated FROM pg_stat_activity
              WHERE usename = 'api_user' AND query LIKE 'SELECT pg_sleep%';"
         if [[ -f "$PID_FILE" ]]; then
