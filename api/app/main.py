@@ -33,12 +33,15 @@ log.addHandler(_handler)
 log.setLevel(logging.INFO)
 log.propagate = False
 
+# Map level names to Python's so filtering by level works
+LEVELS = {"INFO": logging.INFO, "WARN": logging.WARNING, "ERROR": logging.ERROR}
+
 
 def log_event(level: str, event: str, **fields):
     """One JSON object per line, so logs can be grepped or parsed."""
     record = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "level": level, "event": event}
     record.update(fields)
-    log.info(json.dumps(record))
+    log.log(LEVELS.get(level, logging.INFO), json.dumps(record))
 
 
 # ---------------------------------------------------------------- metrics
