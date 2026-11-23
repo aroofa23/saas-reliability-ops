@@ -1,4 +1,4 @@
--- Runs once, the first time the database volume is created.
+-- Runs once, the first time the database volume is created
 
 CREATE TABLE organizations (
     id   SERIAL PRIMARY KEY,
@@ -10,7 +10,7 @@ CREATE TABLE users (
     org_id  INT  NOT NULL REFERENCES organizations(id),
     email   TEXT NOT NULL UNIQUE,
     role    TEXT NOT NULL CHECK (role IN ('viewer', 'agent', 'admin')),
-    api_key TEXT NOT NULL UNIQUE,   -- plain text for the lab; hash it in production
+    api_key TEXT NOT NULL UNIQUE,   -- plain text for the lab, hash it in production
     active  BOOLEAN NOT NULL DEFAULT true
 );
 
@@ -29,7 +29,7 @@ CREATE TABLE tickets (
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT tickets_external_ref_key UNIQUE (external_ref)
 );
--- NOTE: deliberately NO index on tickets.customer_email. That is scenario 1.
+-- Deliberately NO index on tickets.customer_email. That is scenario 1
 
 INSERT INTO organizations (name) VALUES ('Acme Corp'), ('Globex');
 
@@ -40,7 +40,7 @@ INSERT INTO users (org_id, email, role, api_key, active) VALUES
     (1, 'disabled@acme.test', 'agent',  'disabled-key-123',  false),
     (2, 'agent@globex.test',  'agent',  'globex-agent-key',  true);
 
--- Least privilege: the API gets data access only, no DDL.
+-- API gets data access only, no DDL
 CREATE ROLE api_user LOGIN PASSWORD 'apisecret';
 GRANT CONNECT ON DATABASE saas TO api_user;
 GRANT USAGE ON SCHEMA public TO api_user;
